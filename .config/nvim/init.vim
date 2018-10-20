@@ -298,6 +298,9 @@ nmap <leader>tn :tabn<CR>
 nmap <leader>tp :tabp<CR>
 nmap <leader>td :tabc<CR>
 
+" Sudo write with w!!
+cnoremap w!! execute 'silent! write !sudo tee % >/dev/null' <bar> edit!
+
 " Tab mappings
 inoremap <tab> <c-r>=InsertTabWrapper()<cr>
 if !exists("blocktab")
