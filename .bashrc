@@ -131,7 +131,13 @@ __st() { printf "\a\033\\" ; }
 __tmux_guard() { __dcs ; sed 's:\x1b:\x1b\x1b:g' ; __st; };
 __tmuximg2sixel() { img2sixel "$1" | __tmux_guard ; }
 
-<<<<<<< HEAD
+export PATH="~/mybin:$PATH"
+
+# WSL Config
+export PATH="$PATH:/mnt/c/Program Files/Oracle/VirtualBox"
+export VAGRANT_WSL_ENABLE_WINDOWS_ACCESS="1"
+export DISPLAY=envy:0.0
+
 if grep -q Microsoft /proc/version; then
   #echo "Ubuntu on Windows"
   export PATH="$PATH:/mnt/c/Program Files/Oracle/VirtualBox"
@@ -140,11 +146,3 @@ if grep -q Microsoft /proc/version; then
 #else
 #  echo "native Linux"
 fi
-=======
-export PATH="~/mybin:$PATH"
-
-# WSL Config
-export PATH="$PATH:/mnt/c/Program Files/Oracle/VirtualBox"
-export VAGRANT_WSL_ENABLE_WINDOWS_ACCESS="1"
-export DISPLAY=envy:0.0
->>>>>>> 1102c5af03051fcc2067659bdd9348056a41ef6e
