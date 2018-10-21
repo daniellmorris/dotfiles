@@ -133,11 +133,6 @@ __tmuximg2sixel() { img2sixel "$1" | __tmux_guard ; }
 
 export PATH="~/mybin:$PATH"
 
-# WSL Config
-export PATH="$PATH:/mnt/c/Program Files/Oracle/VirtualBox"
-export VAGRANT_WSL_ENABLE_WINDOWS_ACCESS="1"
-export DISPLAY=envy:0.0
-
 if grep -q Microsoft /proc/version; then
   #echo "Ubuntu on Windows"
   export PATH="$PATH:/mnt/c/Program Files/Oracle/VirtualBox"
