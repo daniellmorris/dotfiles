@@ -131,7 +131,7 @@ __st() { printf "\a\033\\" ; }
 __tmux_guard() { __dcs ; sed 's:\x1b:\x1b\x1b:g' ; __st; };
 __tmuximg2sixel() { img2sixel "$1" | __tmux_guard ; }
 
-export PATH="~/mybin:$PATH"
+export PATH="~/my/bin:$PATH"
 
 if grep -q Microsoft /proc/version; then
   #echo "Ubuntu on Windows"
