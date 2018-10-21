@@ -126,11 +126,16 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
-export PATH="$PATH:/mnt/c/Program Files/Oracle/VirtualBox"
-export VAGRANT_WSL_ENABLE_WINDOWS_ACCESS="1"
-export DISPLAY=envy:0.0
-
 __dcs () { printf "\033Ptmux;\033\033]" ; }
 __st() { printf "\a\033\\" ; }
 __tmux_guard() { __dcs ; sed 's:\x1b:\x1b\x1b:g' ; __st; };
 __tmuximg2sixel() { img2sixel "$1" | __tmux_guard ; }
+
+if grep -q Microsoft /proc/version; then
+  #echo "Ubuntu on Windows"
+  export PATH="$PATH:/mnt/c/Program Files/Oracle/VirtualBox"
+  export VAGRANT_WSL_ENABLE_WINDOWS_ACCESS="1"
+  export DISPLAY=envy:0.0
+#else
+#  echo "native Linux"
+fi
