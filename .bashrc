@@ -122,22 +122,54 @@ export VAGRANT_DEFAULT_PROVIDER="virtualbox"
 
 [ -f ~/.fzf.bash ] && source ~/.fzf.bash
 
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+# ONLY start nvm/rvm if tmux not running yet
+if ! { [ "$TERM" = "screen-256color" ] && [ -n "$TMUX" ]; } then
+  # If in a bash startup then we need this to do all exports and everything
+  export NVM_DIR="$HOME/.nvm"
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+  [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+  # Add RVM to PATH for scripting. Make sure this is the last PATH variable change.
+  export PATH="$PATH:$HOME/.rvm/bin"
+  [[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm" # Load RVM into a shell session *as a function*
+
+else 
+  # All node packages are already part of the path - We just need reference to nvm (We will lazy load it)
+  lazynvm() {
+    unset -f nvm
+    export NVM_DIR=~/.nvm
+    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"  # This loads nvm
+  }
+
+  nvm() {
+    lazynvm 
+    nvm $@
+  }
+fi
 
 __dcs () { printf "\033Ptmux;\033\033]" ; }
 __st() { printf "\a\033\\" ; }
 __tmux_guard() { __dcs ; sed 's:\x1b:\x1b\x1b:g' ; __st; };
 __tmuximg2sixel() { img2sixel "$1" | __tmux_guard ; }
 
-export PATH="~/my/bin:$PATH"
+#export PATH="~/my/bin:$PATH"
 
 if grep -q Microsoft /proc/version; then
   #echo "Ubuntu on Windows"
   export PATH="$PATH:/mnt/c/Program Files/Oracle/VirtualBox"
   export VAGRANT_WSL_ENABLE_WINDOWS_ACCESS="1"
-  export DISPLAY=envy:0.0
+  #export DISPLAY=envy:0.0
+  export DISPLAY=127.0.0.1:0.0
+  
+  export DOCKER_HOST=tcp://192.168.99.100:2375
+  export DOCKER_TLS_VERIFY="1"
+  export DOCKER_HOST="tcp://192.168.99.100:2376"
+  export DOCKER_CERT_PATH="/mnt/c/Users/Daniel Morris/.docker/machine/machines/default"
+  export DOCKER_MACHINE_NAME="default"
+  export COMPOSE_CONVERT_WINDOWS_PATHS="true"
 #else
 #  echo "native Linux"
 fi
+
+# Add RVM to PATH for scripting. Make sure this is the last PATH variable change.
+export PATH="$PATH:$HOME/.rvm/bin"

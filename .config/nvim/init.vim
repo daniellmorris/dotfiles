@@ -73,6 +73,13 @@ Plug 'vim-scripts/utl.vim' " Follow links
 " Google integrations
 Plug 'itchyny/calendar.vim'
 
+" HTML quick edit
+Plug 'mattn/emmet-vim'
+
+" Vim DB
+Plug 'tpope/vim-dadbod'
+
+
 " Plug 'neilagabriel/vim-geeknote'
 
 " Markdown
@@ -98,6 +105,7 @@ set signcolumn=yes
 " General mappings
 " ,,     mode switching (mapped to esc)
 " ,b     switch to alternate buffer
+" ,eh    edit here - Expands the :e <current_directory>
 " ,ev    'e'dit 'v'imrc file
 " ,sv    's'ource 'v'imrc file
 " ,aa    swap to the alternate (header/source) file
@@ -198,6 +206,7 @@ cmap <leader><leader> <c-c>
 vmap <leader><leader> <esc>
 nmap <leader>b :b#<CR>
 nmap <silent> <leader>ev :e $MYVIMRC<cr>
+nnoremap <Leader>eh :e <C-R>=expand('%:p:h') . '/'<CR>
 nmap <silent> <leader>sv :so $MYVIMRC<cr>
 "nmap <leader>s :setlocal spell! spelllang=en_us<CR>
 nmap <leader>aa :call SwitchSourceHeader("norm")<CR>
@@ -555,19 +564,59 @@ runtime macros/matchit.vim
 "     augroup END
 " endfunction
 " call SetupPrettier()
+
+
+" let g:project='GDP'
+let g:project='Synergy'
 function! DestroyPrettier()
-    augroup NeoformatAutoFormat
-        autocmd!
-    augroup END
+    if (g:project=="GDP")
+        augroup NeoformatAutoFormat
+            autocmd!
+        augroup END
+    else
+        augroup NeoformatAutoFormat
+            autocmd!
+        augroup END
+    endif
 endfunction
 function! SetupPrettier()
-    augroup NeoformatAutoFormat
-        autocmd!
-        autocmd BufWritePre *.js MyPrettyFile
-    augroup END
+    if (g:project=="GDP") 
+        augroup NeoformatAutoFormat
+            autocmd!
+            autocmd BufWritePre *.js MyPrettyFile
+        augroup END
+    else
+        augroup NeoformatAutoFormat
+            autocmd!
+            autocmd BufWritePre *.js MyEsformatFile
+            autocmd BufWritePre *.vue MyEsformatFile
+        augroup END
+    endif
+endfunction
+function! EsLintFn()
+    let line=line(".")
+    let bufferVar=system("eslint --fix-dry-run --stdin --stdin-filename % --format=json | python -c 'import sys, json; j=json.load(sys.stdin)[0]; sys.stdout.write(j[\"source\"] if \"source\" in j else j[\"output\"]);'",join(getline(1,'$'),"\n"))
+    "normal mk | :1,$d | :put =bufferVar | :1d | normal 'k
+    :1,$d | :put =bufferVar | :1d
+    :execute 'normal '.line.'G'
+    "normal mk 
+    ":silent exec "%!eslint --fix-dry-run --stdin --stdin-filename % --format=json | python -c 'import sys, json; j=json.load(sys.stdin)[0]; sys.stdout.write(j[\"source\"] if \"source\" in j else j[\"output\"]);'"
+    "normal 'k
 endfunction
 command! MyPrettyFile :w | :silent exec "!prettier --write --single-quote --trailing-comma es5 % >/dev/null 2>&1" | :e
+" command! MyEsformatFile :w | :silent exec "!eslint --fix % >/dev/null 2>&1" | :e
+command! MyEsformatFile call EsLintFn()
 call SetupPrettier()
+
+""""""""""""""""""""""""""
+" Dadbod - Database stuff
+"""""""""""""""""""""""""
+command! -range -nargs=0 DDL exec ":DB SELECT table_schema,table_name,column_name,data_type,character_maximum_length from INFORMATION_SCHEMA.COLUMNS WHERE table_name='".vebugger#util#get_visual_selection()."'"
+command! -range -nargs=0 TBLS exec ":DB SELECT DISTINCT table_name from INFORMATION_SCHEMA.COLUMNS WHERE table_schema='".vebugger#util#get_visual_selection()."'"
+command! -nargs=0 TBLS exec ":DB SELECT table_schema || '.' || table_name AS table, array_agg(column_name::TEXT) as columns from INFORMATION_SCHEMA.COLUMNS WHERE table_schema not in ('information_schema', 'pg_catalog') GROUP BY table_schema || '.' || table_name ORDER by table_schema || '.' || table_name;"
+command! -nargs=0 TABLES exec ":DB SELECT table_schema || '.' || table_name AS table, array_agg(column_name::TEXT) as columns from INFORMATION_SCHEMA.COLUMNS WHERE table_schema not in ('information_schema', 'pg_catalog') GROUP BY table_schema || '.' || table_name ORDER by table_schema || '.' || table_name;"
+command! -range -nargs=0 SELECT exec ":DB SELECT * FROM ".'"'.join(split(vebugger#util#get_visual_selection(), '\\.'), '".\"').'"'." LIMIT 10000"
+command! -nargs=0 SCHEMA exec ":DB SELECT DISTINCT table_schema from INFORMATION_SCHEMA.COLUMNS"
 
 """"""""""""""""""""""""""
 " Git settings
@@ -687,6 +736,12 @@ let g:fzf_colors =
 let g:fzf_history_dir = '~/.local/share/fzf-history'
 
 """"""""""""""""""""""""""
+" HTML Emmet
+"""""""""""""""""""""""""
+let g:user_emmet_install_global = 0
+autocmd filetype html,css EmmetInstall
+
+""""""""""""""""""""""""""
 " TMUX command sidebar
 """""""""""""""""""""""""
 function! TmuxSidebarCmd(cmd)
@@ -750,7 +805,18 @@ function! DebugStrategy(cmd)
   "call test#strategy#vtr(a:cmd.' --inspect-brk')
   :silent exec "!tmux list-panes | wc -l | awk '{if ($0=="1") {system(\"tmux split-window -v\")}}'"
   :silent exec "!tmux send-keys -t bottom C-c"
-  :silent exec '!tmux send-keys -t bottom "'.a:cmd.' --inspect-brk'.'" C-m'
+  :silent exec '!tmux send-keys -t bottom "NODE_ENV='.g:test#NODE_ENV.' '.a:cmd.' --inspect-brk'.'" C-m'
+  let timer = timer_start(1000, 'AttachDebugger')
+endfunction
+
+function! JestDebugStrategy(cmd)
+  echom 'It works! Command for running tests: ' . a:cmd
+  " :VtrKillRunner
+  "call test#strategy#vtr('nvm use stable')
+  "call test#strategy#vtr(a:cmd.' --inspect-brk')
+  :silent exec "!tmux list-panes | wc -l | awk '{if ($0=="1") {system(\"tmux split-window -v\")}}'"
+  :silent exec "!tmux send-keys -t bottom C-c"
+  :silent exec '!tmux send-keys -t bottom "NODE_ENV=development node --inspect-brk '.a:cmd.'" C-m'
   let timer = timer_start(1000, 'AttachDebugger')
 endfunction
 
@@ -761,19 +827,22 @@ function! NonDebugStrategy(cmd)
   " call test#strategy#vtr(a:cmd)
   :silent exec "!tmux list-panes | wc -l | awk '{if ($0=="1") {system(\"tmux split-window -v\")}}'"
   :silent exec "!tmux send-keys -t bottom C-c"
-  :silent exec '!tmux send-keys -t bottom "'.a:cmd.'" C-m'
+  :silent exec '!tmux send-keys -t bottom "NODE_ENV='.g:test#NODE_ENV.' '.a:cmd.'" C-m'
 endfunction
 
-let g:test#custom_strategies = {'debug': function('DebugStrategy'), 'nondebug': function('NonDebugStrategy')}
+let g:test#custom_strategies = {'debug': function('DebugStrategy'), 'jest_debug': function('JestDebugStrategy'),'nondebug': function('NonDebugStrategy')}
 let g:test#strategy = 'debug'
+let g:test#NODE_ENV = 'test'
+" let g:test#strategy = 'jest_debug'
 let g:vebugger_path_node='/home/daniellmorris/.nvm/versions/node/v8.11.3/bin/node'
 
 nmap <silent> mn :TestNearest<CR> 
 nmap <silent> mf :TestFile<CR>    
 nmap <silent> ms :TestSuite<CR>   
 nmap <silent> mg :TestLast<CR>    
-nmap <silent> mv :TestVisit<CR>   
+    nmap <silent> mv :TestVisit<CR>   
 nmap <silent> md :let g:test#strategy = 'debug'<CR>   
+nmap <silent> mdj :let g:test#strategy = 'jest_debug'<CR>   
 nmap <silent> mdd :let g:test#strategy = 'nondebug'<CR>   
 
 """"""""""""""""""""""""""
@@ -791,7 +860,7 @@ function! RunDebugFile(cmd)
   echom 'It works! Command for running tests: ' . a:cmd
   :VtrKillRunner
   call test#strategy#vtr('nvm use stable')
-  call test#strategy#vtr(a:cmd.' --inspect-brk')
+  "call test#strategy#vtr(a:cmd.' --inspect-brk')
   let timer = timer_start(1000, 'AttachDebugger')
 endfunction
 nnoremap <leader>md :call RunDebugFile('node --inspect-brk '.expand('%:p'))<CR>
