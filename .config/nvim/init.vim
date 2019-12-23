@@ -17,16 +17,20 @@ Plug 'vimwiki/vimwiki'
 
 " Plug 'ternjs/tern_for_vim', {'do':'npm install '}
 
-Plug 'autozimu/LanguageClient-neovim', {
-    \ 'branch': 'next',
-    \ 'do': 'bash install.sh',
-    \ }
+"" This is for language server 
+"Plug 'autozimu/LanguageClient-neovim', {
+"    \ 'branch': 'next',
+"    \ 'do': 'bash install.sh',
+"    \ }
+"Plug 'Shougo/deoplete.nvim', { 'do': ':UpdateRemotePlugins' }
+
+Plug 'neoclide/coc.nvim', {'tag': '*', 'do': './install.sh'}
+
 Plug 'Shougo/echodoc.vim'
 " Plug 'prabirshrestha/async.vim'
 " Plug 'prabirshrestha/vim-lsp'
 Plug 'junegunn/fzf', { 'dir': '~/.fzf', 'do': './install --all' }
 Plug 'junegunn/fzf.vim'
-Plug 'Shougo/deoplete.nvim', { 'do': ':UpdateRemotePlugins' }
 " Show parameter doc.
 Plug 'Shougo/echodoc.vim'
 Plug 'ctrlpvim/ctrlp.vim'
@@ -149,6 +153,7 @@ set signcolumn=yes
 " ,tn    Next tab
 " ,tp    Previous tab
 " ,td    Destroy tab
+" ,tz    Tab zoom (New tab with currennt active buffer)
 "
 " Tab button mappings
 "  In insert mode, autocompletion of words
@@ -157,6 +162,10 @@ set signcolumn=yes
 " Function key mappings
 " F6 - Toggle TagList 
 " =============================================================
+" parcel js Fix to make it detect issues (https://github.com/parcel-bundler/parcel/issues/382)
+set nobackup
+set nowritebackup
+
 " Markdown composer
 let g:markdown_composer_browser = 'w3m'
 let g:markdown_composer_open_browser = 0
@@ -187,6 +196,10 @@ set termguicolors
 let $NVIM_TUI_ENABLE_CURSOR_SHAPE=1
 
 let mapleader=","  
+
+"" Disable ctrl-z stop
+nnoremap <c-z> <nop>
+
 
 ""vnoremap <silent> "+y y:call ClipboardYank()<cr>
 ""nnoremap <silent> "+p :call ClipboardPaste()<cr>p
@@ -223,7 +236,6 @@ nmap <leader>fn :set guifont=DejaVu\\ Sans\\ Mono\\ 9<cr>
 nmap <leader>fs :set guifont=DejaVu\\ Sans\\ Mono\\ 8<cr>
 nmap <leader>s :setlocal spell spelllang=en_us<CR>
 nmap <leader>ss :setlocal nospell<CR>
-
 nmap <leader>a    :Ack! "\b<cword>\b" <CR>
 
 nmap <leader>pp :call DestroyPrettier()<CR>
@@ -306,6 +318,8 @@ nmap <leader>to :tabnew<CR>
 nmap <leader>tn :tabn<CR>
 nmap <leader>tp :tabp<CR>
 nmap <leader>td :tabc<CR>
+" tab zoom (New tab with currennt active buffer)
+nmap <leader>tz :tab split<CR>
 
 " Sudo write with w!!
 cnoremap w!! execute 'silent! write !sudo tee % >/dev/null' <bar> edit!
@@ -437,6 +451,9 @@ let g:gist_use_password_in_gitconfig = 1
 " Git gutter
 " =============================================================
 let g:gitgutter_max_signs = 1000
+nmap <silent> ]g :GitGutterNextHunk<CR>
+nmap <silent> [g :GitGutterPrevHunk<CR>
+
 " =============================================================
 " Line wrapping settings"
 " =============================================================
@@ -588,8 +605,9 @@ function! SetupPrettier()
     else
         augroup NeoformatAutoFormat
             autocmd!
-            autocmd BufWritePre *.js MyEsformatFile
-            autocmd BufWritePre *.vue MyEsformatFile
+            "autocmd BufWritePre *.js MyEsformatFile
+            "autocmd BufWritePre *.vue MyEsformatFile
+            autocmd BufWritePre *.js :CocCommand eslint.executeAutofix
         augroup END
     endif
 endfunction
@@ -603,11 +621,36 @@ function! EsLintFn()
     ":silent exec "%!eslint --fix-dry-run --stdin --stdin-filename % --format=json | python -c 'import sys, json; j=json.load(sys.stdin)[0]; sys.stdout.write(j[\"source\"] if \"source\" in j else j[\"output\"]);'"
     "normal 'k
 endfunction
+function! EsLintFnCoc()
+    :CocCommand eslint.executeAutofix
+endfunction
 command! MyPrettyFile :w | :silent exec "!prettier --write --single-quote --trailing-comma es5 % >/dev/null 2>&1" | :e
 " command! MyEsformatFile :w | :silent exec "!eslint --fix % >/dev/null 2>&1" | :e
 command! MyEsformatFile call EsLintFn()
 call SetupPrettier()
 
+""""""""""""""""""""""""""
+" Shell command to buffer
+"""""""""""""""""""""""""
+command! -complete=shellcmd -nargs=+ Shell call s:RunShellCommand(<q-args>)
+function! s:RunShellCommand(cmdline)
+  echo a:cmdline
+  let expanded_cmdline = a:cmdline
+  for part in split(a:cmdline, ' ')
+     if part[0] =~ '\v[%#<]'
+        let expanded_part = fnameescape(expand(part))
+        let expanded_cmdline = substitute(expanded_cmdline, part, expanded_part, '')
+     endif
+  endfor
+  botright new
+  setlocal buftype=nofile bufhidden=wipe nobuflisted noswapfile nowrap
+  call setline(1, 'You entered:    ' . a:cmdline)
+  call setline(2, 'Expanded Form:  ' .expanded_cmdline)
+  call setline(3,substitute(getline(2),'.','=','g'))
+  execute '$read !'. expanded_cmdline
+  setlocal nomodifiable
+  1
+endfunction
 """"""""""""""""""""""""""
 " Dadbod - Database stuff
 """""""""""""""""""""""""
@@ -615,8 +658,17 @@ command! -range -nargs=0 DDL exec ":DB SELECT table_schema,table_name,column_nam
 command! -range -nargs=0 TBLS exec ":DB SELECT DISTINCT table_name from INFORMATION_SCHEMA.COLUMNS WHERE table_schema='".vebugger#util#get_visual_selection()."'"
 command! -nargs=0 TBLS exec ":DB SELECT table_schema || '.' || table_name AS table, array_agg(column_name::TEXT) as columns from INFORMATION_SCHEMA.COLUMNS WHERE table_schema not in ('information_schema', 'pg_catalog') GROUP BY table_schema || '.' || table_name ORDER by table_schema || '.' || table_name;"
 command! -nargs=0 TABLES exec ":DB SELECT table_schema || '.' || table_name AS table, array_agg(column_name::TEXT) as columns from INFORMATION_SCHEMA.COLUMNS WHERE table_schema not in ('information_schema', 'pg_catalog') GROUP BY table_schema || '.' || table_name ORDER by table_schema || '.' || table_name;"
-command! -range -nargs=0 SELECT exec ":DB SELECT * FROM ".'"'.join(split(vebugger#util#get_visual_selection(), '\\.'), '".\"').'"'." LIMIT 10000"
+command! -range -nargs=0 SELECT exec ":DB SELECT * FROM ".'"'.join(split(vebugger#util#get_visual_selection(), '\\.'), '".\"').'"'." LIMIT 500"
+command! -range -nargs=0 COUNT exec ":DB SELECT count( *) FROM ".'"'.join(split(vebugger#util#get_visual_selection(), '\\.'), '".\"').'"'.""
+command! -range -nargs=0 VIEWDEF exec ":DB SELECT pg_get_viewdef('".vebugger#util#get_visual_selection()."')"
+command! -range -nargs=0 FNDEF exec ":DB select pg_get_functiondef(oid) from pg_proc where proname ='".vebugger#util#get_visual_selection()."'"
+command! -range -nargs=0 TYPEDEF exec ":DB select attribute_name, data_type from information_schema.attributes where udt_name = '".vebugger#util#get_visual_selection()."'"
+command! -range -nargs=0 ENUMDEF exec ":DB SELECT enum_range(null::".vebugger#util#get_visual_selection().")"
 command! -nargs=0 SCHEMA exec ":DB SELECT DISTINCT table_schema from INFORMATION_SCHEMA.COLUMNS"
+""""""""""""""""""""""""""
+" Postgresql Command to get schema of specified table
+"""""""""""""""""""""""""
+command! -range -nargs=0 PGDUMP exec 'Shell pg_dump ' . g:db . ' -t ' . vebugger#util#get_visual_selection() . ' --schema-only'
 
 """"""""""""""""""""""""""
 " Git settings
@@ -633,68 +685,167 @@ endif
 """"""""""""""""""""""""""
 " Language server - Javascript
 """""""""""""""""""""""""
-" Automatically start language servers.
-let g:LanguageClient_autoStart = 1
-let g:LanguageClient_loggingLevel = 'ERROR'
-" Minimal LSP configuration for JavaScript
-" let g:LanguageClient_serverCommands = {}
-" if executable('javascript-typescript-stdio')
-"   let g:LanguageClient_serverCommands.javascript = ['javascript-typescript-stdio']
-"   " Use LanguageServer for omnifunc completion
-"   " autocmd FileType javascript setlocal omnifunc=LanguageClient#complete
-" else
-"   echo "javascript-typescript-stdio not installed!\n"
-"   :cq
-" endif
-" 
-" filetype plugin on
-" set omnifunc=syntaxcomplete#Complete
-" " <leader>ld to go to definition
-" autocmd FileType javascript nnoremap <buffer>
-"   \ <leader>ld :call LanguageClient#textDocument_definition()<cr>
-" " <leader>lh for type info under cursor
-" autocmd FileType javascript nnoremap <buffer>
-"   \ <leader>lh :call LanguageClient_textDocument_hover()<cr>
-" " <leader>lr to rename variable under cursor
-" autocmd FileType javascript nnoremap <buffer>
-"   \ <leader>lr :call LanguageClient_textDocument_rename()<cr>
+function! SetupLanguageServer() 
+    " Automatically start language servers.
+    let g:LanguageClient_autoStart = 1
+    let g:LanguageClient_loggingLevel = 'ERROR'
+    " Minimal LSP configuration for JavaScript
+    " let g:LanguageClient_serverCommands = {}
+    " if executable('javascript-typescript-stdio')
+    "   let g:LanguageClient_serverCommands.javascript = ['javascript-typescript-stdio']
+    "   " Use LanguageServer for omnifunc completion
+    "   " autocmd FileType javascript setlocal omnifunc=LanguageClient#complete
+    " else
+    "   echo "javascript-typescript-stdio not installed!\n"
+    "   :cq
+    " endif
+    " 
+    " filetype plugin on
+    " set omnifunc=syntaxcomplete#Complete
+    " " <leader>ld to go to definition
+    " autocmd FileType javascript nnoremap <buffer>
+    "   \ <leader>ld :call LanguageClient#textDocument_definition()<cr>
+    " " <leader>lh for type info under cursor
+    " autocmd FileType javascript nnoremap <buffer>
+    "   \ <leader>lh :call LanguageClient_textDocument_hover()<cr>
+    " " <leader>lr to rename variable under cursor
+    " autocmd FileType javascript nnoremap <buffer>
+    "   \ <leader>lr :call LanguageClient_textDocument_rename()<cr>
 
-let g:LanguageClient_serverCommands = {
-    \ 'javascript': ['javascript-typescript-stdio'],
-    \ }
+    let g:LanguageClient_serverCommands = {
+        \ 'javascript': ['javascript-typescript-stdio'],
+        \ }
 
-" Make so warning do not show up
-let g:LanguageClient_windowLogMessageLevel = "Error"
+    " Make so warning do not show up
+    let g:LanguageClient_windowLogMessageLevel = "Error"
 
-autocmd FileType javascript setlocal omnifunc=LanguageClient#complete
-" set omnifunc=syntaxcomplete#Complete
+    autocmd FileType javascript setlocal omnifunc=LanguageClient#complete
+    " set omnifunc=syntaxcomplete#Complete
 
-nnoremap <F5> :call LanguageClient_contextMenu()<CR>
-" Or map each action separately
-nnoremap <silent> K :call LanguageClient#textDocument_hover()<CR>
-nnoremap <silent> <F2> :call LanguageClient#textDocument_rename()<CR>
+    nnoremap <F5> :call LanguageClient_contextMenu()<CR>
+    " Or map each action separately
+    nnoremap <silent> K :call LanguageClient#textDocument_hover()<CR>
+    nnoremap <silent> <F2> :call LanguageClient#textDocument_rename()<CR>
 
-nnoremap <silent> <leader>ld :call LanguageClient#textDocument_definition()<CR>
-nnoremap <silent> <leader>lr :call LanguageClient#textDocument_references()<CR>
-nnoremap <silent> <leader>lf :call LanguageClient#textDocument_documentSymbol()<CR>
-nnoremap <silent> <leader>lh :call LanguageClient#textDocument_hover()<CR>
-nnoremap <silent> gd :call LanguageClient#textDocument_definition()<CR>
-nnoremap <silent> <F12> :call LanguageClient#textDocument_definition()<CR>
+    nnoremap <silent> <leader>ld :call LanguageClient#textDocument_definition()<CR>
+    nnoremap <silent> <leader>lr :call LanguageClient#textDocument_references()<CR>
+    nnoremap <silent> <leader>lf :call LanguageClient#textDocument_documentSymbol()<CR>
+    nnoremap <silent> <leader>lh :call LanguageClient#textDocument_hover()<CR>
+    nnoremap <silent> gd :call LanguageClient#textDocument_definition()<CR>
+    nnoremap <silent> <F12> :call LanguageClient#textDocument_definition()<CR>
 
-let g:deoplete#enable_at_startup = 1
-call deoplete#custom#source('LanguageClient',
-            \ 'min_pattern_length',
-            \ 2)
+    let g:deoplete#enable_at_startup = 1
+    call deoplete#custom#source('LanguageClient',
+                \ 'min_pattern_length',
+                \ 2)
 
-" Doesn't quite work
-"let b:Plugin_LanguageClient_started = 0
-"augroup LanguageClient_signature
-"	autocmd!
-"    autocmd FileType javascript let b:Plugin_LanguageClient_started = 1
-"	autocmd User LanguageClientStarted let b:Plugin_LanguageClient_started = 1
-"	autocmd User LanguageClientStopped let b:Plugin_LanguageClient_started = 0
-"	autocmd CursorMoved * if b:Plugin_LanguageClient_started | call LanguageClient#textDocument_signatureHelp() | endif
-"augroup END
+    " Doesn't quite work
+    "let b:Plugin_LanguageClient_started = 0
+    "augroup LanguageClient_signature
+    "	autocmd!
+    "    autocmd FileType javascript let b:Plugin_LanguageClient_started = 1
+    "	autocmd User LanguageClientStarted let b:Plugin_LanguageClient_started = 1
+    "	autocmd User LanguageClientStopped let b:Plugin_LanguageClient_started = 0
+    "	autocmd CursorMoved * if b:Plugin_LanguageClient_started | call LanguageClient#textDocument_signatureHelp() | endif
+    "augroup END
+endfunction
+" call SetupLanguageServer()
+
+""""""""""""""""""""""""""
+" COC (Another Language server protocal extension)
+"""""""""""""""""""""""""
+function! SetupMyCoc() 
+    " Use <c-space> to trigger completion.
+    inoremap <silent><expr> <c-space> coc#refresh()
+
+    " Use `[a` and `]a` to navigate diagnostics
+    nmap <silent> [a <Plug>(coc-diagnostic-prev)
+    nmap <silent> ]a <Plug>(coc-diagnostic-next)
+
+    " Remap keys for gotos
+    nmap <silent> gd <Plug>(coc-definition)
+    nmap <silent> gy <Plug>(coc-type-definition)
+    nmap <silent> gi <Plug>(coc-implementation)
+    nmap <silent> gr <Plug>(coc-references)
+
+    " Use K to show documentation in preview window
+    nnoremap <silent> K :call <SID>show_documentation()<CR>
+
+    function! s:show_documentation()
+      if (index(['vim','help'], &filetype) >= 0)
+        execute 'h '.expand('<cword>')
+      else
+        call CocAction('doHover')
+      endif
+    endfunction
+
+    " Highlight symbol under cursor on CursorHold
+    autocmd CursorHold * silent call CocActionAsync('highlight')
+
+    " Remap for rename current word
+    nmap <leader>rn <Plug>(coc-rename)
+
+    " Remap for format selected region
+    xmap <leader>f  <Plug>(coc-format-selected)
+    nmap <leader>f  <Plug>(coc-format-selected)
+
+    augroup mygroup
+      autocmd!
+      " Setup formatexpr specified filetype(s).
+      autocmd FileType typescript,json setl formatexpr=CocAction('formatSelected')
+      " Update signature help on jump placeholder
+      autocmd User CocJumpPlaceholder call CocActionAsync('showSignatureHelp')
+    augroup end
+
+    " Remap for do codeAction of selected region, ex: `<leader>aap` for current paragraph
+    xmap <leader>a  <Plug>(coc-codeaction-selected)
+    nmap <leader>a  <Plug>(coc-codeaction-selected)
+
+    " Remap for do codeAction of current line
+    nmap <leader>ac  <Plug>(coc-codeaction)
+    " Fix autofix problem of current line
+    nmap <leader>qf  <Plug>(coc-fix-current)
+
+    " Use `:Format` to format current buffer
+    command! -nargs=0 Format :call CocAction('format')
+
+    " Use `:Fold` to fold current buffer
+    command! -nargs=? Fold :call     CocAction('fold', <f-args>)
+
+
+    " Add diagnostic info for https://github.com/itchyny/lightline.vim
+    let g:lightline = {
+          \ 'colorscheme': 'wombat',
+          \ 'active': {
+          \   'left': [ [ 'mode', 'paste' ],
+          \             [ 'cocstatus', 'readonly', 'filename', 'modified' ] ]
+          \ },
+          \ 'component_function': {
+          \   'cocstatus': 'coc#status'
+          \ },
+          \ }
+
+
+
+    " Using CocList
+    " Show all diagnostics
+    nnoremap <silent> <space>a  :<C-u>CocList diagnostics<cr>
+    " Manage extensions
+    nnoremap <silent> <space>e  :<C-u>CocList extensions<cr>
+    " Show commands
+    nnoremap <silent> <space>c  :<C-u>CocList commands<cr>
+    " Find symbol of current document
+    nnoremap <silent> <space>o  :<C-u>CocList outline<cr>
+    " Search workspace symbols
+    nnoremap <silent> <space>s  :<C-u>CocList -I symbols<cr>
+    " Do default action for next item.
+    nnoremap <silent> <space>j  :<C-u>CocNext<CR>
+    " Do default action for previous item.
+    nnoremap <silent> <space>k  :<C-u>CocPrev<CR>
+    " Resume latest coc list
+    nnoremap <silent> <space>p  :<C-u>CocListResume<CR>
+endfunction
+call SetupMyCoc()
 """"""""""""""""""""""""""
 " FZF (fzf)
 """""""""""""""""""""""""
@@ -834,36 +985,25 @@ let g:test#custom_strategies = {'debug': function('DebugStrategy'), 'jest_debug'
 let g:test#strategy = 'debug'
 let g:test#NODE_ENV = 'test'
 " let g:test#strategy = 'jest_debug'
-let g:vebugger_path_node='/home/daniellmorris/.nvm/versions/node/v8.11.3/bin/node'
+let g:vebugger_path_node='/home/daniellmorris/.nvm/versions/node/v8.16.0/bin/node'
 
 nmap <silent> mn :TestNearest<CR> 
 nmap <silent> mf :TestFile<CR>    
 nmap <silent> ms :TestSuite<CR>   
 nmap <silent> mg :TestLast<CR>    
-    nmap <silent> mv :TestVisit<CR>   
+nmap <silent> mv :TestVisit<CR>   
 nmap <silent> md :let g:test#strategy = 'debug'<CR>   
 nmap <silent> mdj :let g:test#strategy = 'jest_debug'<CR>   
 nmap <silent> mdd :let g:test#strategy = 'nondebug'<CR>   
 
+nmap <silent> da :call vebugger#ninspect#attach('127.0.0.1:9229', {'args':[]})<CR>   
+
 """"""""""""""""""""""""""
 " Run current file
 """""""""""""""""""""""""
-function! RunFile(cmd)
-  echom 'It works! Command for running tests: ' . a:cmd
-  :VtrKillRunner
-  call test#strategy#vtr('nvm use stable')
-  call test#strategy#vtr(a:cmd)
-endfunction
-nnoremap <leader>mr :call RunFile('node '.expand('%:p'))<CR>
-
-function! RunDebugFile(cmd)
-  echom 'It works! Command for running tests: ' . a:cmd
-  :VtrKillRunner
-  call test#strategy#vtr('nvm use stable')
-  "call test#strategy#vtr(a:cmd.' --inspect-brk')
-  let timer = timer_start(1000, 'AttachDebugger')
-endfunction
-nnoremap <leader>md :call RunDebugFile('node --inspect-brk '.expand('%:p'))<CR>
+nnoremap <leader>mr :call NonDebugStrategy('clear && node '.expand('%:p'))<CR>
+nnoremap <leader>mw :call NonDebugStrategy('clear && nodemon '.expand('%:p').' --watch '.expand('%:p:h'))<CR>
+nnoremap <leader>md :call DebugStrategy('clear && node --inspect-brk '.expand('%:p'))<CR>
 
 """"""""""""""""""""""""""
 " Run selected package.json selected stuff

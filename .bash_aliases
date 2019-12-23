@@ -1,5 +1,5 @@
 #codespace grep
-alias loc='grep -R --exclude=*svn* --exclude=*node_modules* --exclude-dir=builds --exclude-dir=bin --exclude-dir=doc --exclude-dir=nutos --exclude=*2.tmp --exclude=*.alst --exclude=*.lst --exclude=*.o --exclude=*.a --exclude=*.tmp --exclude=*.swp --exclude=*.swo --exclude-dir=Release --exclude-dir=app/views/bill/timesheets --exclude-dir=log --exclude-dir=public/datasheets --exclude=cscope.out --exclude=tags'
+alias loc='grep -R --exclude-dir=.svn --exclude-dir=node_modules --exclude-dir=builds --exclude=*2.tmp --exclude=*.alst --exclude=*.lst --exclude=*.o --exclude=*.a --exclude=*.tmp --exclude=*.swp --exclude=*.swo --exclude-dir=Release --exclude-dir=app/views/bill/timesheets --exclude-dir=log --exclude-dir=public/datasheets --exclude=cscope.out --exclude=tags'
 #alias loc='ack-grep'
 
 
